@@ -11,7 +11,7 @@ DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
 DEFAULT_API_BASE_URL = os.getenv(
     "API_BASE_URL", "https://risk-scoring-api-o9ec.onrender.com"
 ).rstrip("/")
-MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", f"{DEFAULT_API_BASE_URL}/mcp").rstrip("/")
+MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", f"{DEFAULT_API_BASE_URL}/mcp/").rstrip("/") + "/"
 
 
 def _build_instructions(case: dict, scoring: dict, pe_euros: float) -> str:

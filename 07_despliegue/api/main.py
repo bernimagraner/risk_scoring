@@ -1,12 +1,23 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException
 from .schemas import LoteEntrada, ScoringSalida
 from .inference import score_registro
 from .mcp_server import mcp
 
-app = FastAPI(title="API Scoring Riesgos")
+mcp_app = mcp.streamable_http_app()
 
-# Servidor MCP real en /mcp (Streamable HTTP)
-app.mount("/mcp", mcp.streamable_http_app())
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    async with mcp.session_manager.run():
+        yield
+
+
+app = FastAPI(title="API Scoring Riesgos", lifespan=lifespan)
+
+# Servidor MCP en /mcp (Streamable HTTP, stateless para OpenAI)
+app.mount("/mcp", mcp_app)
 
 
 @app.post("/predict", response_model=list[ScoringSalida])

@@ -8,6 +8,8 @@ mcp = FastMCP(
         "Servidor MCP de scoring de riesgo crediticio. "
         "Genera y evalúa escenarios alternativos de préstamo."
     ),
+    streamable_http_path="/",
+    stateless_http=True,
 )
 
 
