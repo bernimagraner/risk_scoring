@@ -1,0 +1,584 @@
+
+CREACIÓN DE UN MCP SERVER
+Este documento recoge una guía básica para crear un MCP Server sobre el deployment ya construido, apoyándonos en dos prompts que estructuran el proceso de trabajo con el agente.
+El primero está orientado a preparar al agente, obligándolo a inspeccionar el proyecto, entender la estructura existente y recopilar la información necesaria antes de proponer cambios.
+El segundo parte de ese análisis previo y proporciona al agente las instrucciones necesarias para implementar la solución de forma controlada, siguiendo las pautas definidas y minimizando el riesgo sobre lo ya funcional.
+La siguiente imagen muestra la estructura de carpetas esperada al finalizar el proceso.
+Prompt 1:
+# Inspección, alineación y plan de cambios
+Quiero que actúes como agente técnico sobre un proyecto Python ya existente con FastAPI + Streamlit.
+En esta fase NO quiero que implementes todavía la solución completa.
+Tu trabajo ahora es:
+inspeccionar el código real, 
+validar la integración existente, 
+resolver correctamente la decisión técnica sobre la incorporación de MCP protocol real, 
+y proponer un plan de cambios seguro, simple y alineado con la estructura actual.
+## 1. CONTEXTO DEL PROYECTO
+La estructura relevante actual es:
+07_deployment/
+├── api/
+│   ├── main.py
+│   ├── schemas.py
+│   └── scoring.py
+└── app/
+    └── app.py
+Estado actual:
+La API ya funciona.
+La app Streamlit ya funciona.
+Todo se prueba primero en local y luego se despliega en Render.
+Ya existe un endpoint principal de scoring.
+La app Streamlit ya llama a la API y muestra el resultado de riesgo.
+Objetivo funcional buscado:
+Incorporar MCP protocol real dentro de la solución actual.
+Mantener intacta la funcionalidad ya operativa en la medida de lo posible.
+Solo cuando un caso tenga riesgo alto, debe habilitarse un chat.
+Ese chat debe usar OpenAI.
+El agente/LLM debe poder consultar un servidor MCP real para obtener escenarios alternativos.
+Ese servidor MCP debe generar, evaluar, filtrar y ordenar alternativas.
+El LLM solo debe explicar las alternativas en lenguaje natural.
+La solución debe seguir siendo sencilla, clara y didáctica.
+## 2. RESTRICCIONES DE DISEÑO
+Debes respetar estas reglas:
+Prioriza no romper nada de lo que ya funciona.
+No hagas refactors grandes.
+No reorganices las carpetas existentes.
+No cambies contratos externos de la API salvo necesidad real.
+Si tocar un archivo existente puede ser frágil, propone crear un archivo nuevo.
+No mezcles los schemas actuales de la API con los contratos internos del MCP si eso puede introducir riesgo.
+No propongas multiagente.
+No propongas arquitectura compleja.
+No propongas microservicios adicionales si no son estrictamente necesarios.
+No uses pandas.
+No uses async salvo que el framework MCP o el patrón de integración elegido lo exija de forma inevitable y lo justifiques.
+No uses inyección de dependencias avanzada.
+No uses clases de servicio complejas si no aportan valor claro.
+Prefiere funciones explícitas y módulos simples.
+Si detectas discrepancias entre esta especificación y el código real, debe prevalecer el código real y debes señalarlo.
+No inventes detalles del protocolo MCP ni de sus rutas si no los verificas explícitamente en el framework o documentación que decidas usar.
+En desarrollo local, la integración con OpenAI debe poder leer `OPENAI_API_KEY` desde un archivo `.env` si ya existe en el proyecto.
+Ese archivo `.env` es solo para entorno local y no forma parte del despliegue.
+En Render, la clave debe obtenerse desde las variables de entorno del servicio.
+No se debe hardcodear la API key en ningún archivo del proyecto.
+## 3. DECISIÓN TÉCNICA OBLIGATORIA SOBRE MCP
+Hay una cuestión crítica que debes respetar:
+El requisito NO es crear una API auxiliar parecida a MCP.
+El requisito es incorporar MCP protocol real.
+Por tanto:
+No puedes proponer como solución final un endpoint REST propio que simplemente imite MCP.
+No puedes llamar “MCP real” a una API auxiliar interna.
+Debes proponer un servidor MCP real embebido dentro de la capa API existente, salvo que demuestres técnicamente que no es viable dentro de esta estructura concreta.
+Debes asumir que el agente/LLM será quien consuma el servidor MCP, no la app Streamlit directamente.
+La app Streamlit solo debe:
+detectar el caso rojo
+activar el chat
+pasar el contexto del caso al servicio/agente
+Decisiones cerradas por defecto
+Debes asumir como diseño preferente y cerrado lo siguiente:
+Debes usar como opción preferente un framework MCP real en Python del tipo FastMCP / MCP Python SDK, salvo limitación real y verificada.
+Debes asumir un único endpoint MCP URL como diseño por defecto.
+Para esta solución, fija por defecto la ruta `/mcp`, salvo exigencia explícita y verificada del framework elegido.
+No dejes alternativas abiertas como `/mcp` o `/mcp/v1` salvo necesidad real demostrada.
+Debes asumir que el servidor MCP expondrá una única tool principal por defecto, encargada de simular, evaluar, filtrar y ordenar alternativas.
+Solo podrás proponer una segunda tool si justificas claramente por qué aporta valor real sin complicar la solución.
+Debes asumir que la integración con OpenAI se hará de forma preferente mediante:
+`app/agent_service.py`
+Responses API
+tool type `mcp`
+`server_url` apuntando al endpoint MCP real
+No propongas function calling manual ni una API auxiliar como sustituto del MCP protocol real salvo imposibilidad técnica verificada.
+No inventes rutas o pseudoestándares MCP si no los verificas explícitamente.
+Tu análisis debe dejar muy claro:
+cómo encaja un servidor MCP real dentro de la API existente
+qué framework MCP real propones usar
+cómo el agente lo consumiría desde OpenAI
+cómo se evita romper /predict
+cómo se mantiene la solución simple
+## 4. COMPORTAMIENTO FUNCIONAL DE REFERENCIA
+Estas reglas deben guiar tu análisis, pero primero debes contrastarlas con el código real existente.
+Clasificación del riesgo usando pérdida esperada (PE)
+pe &lt; 1000 -&gt; bajo
+1000 &lt;= pe &lt; 5000 -&gt; medio
+pe &gt;= 5000 -&gt; alto
+Activación del chat
+solo si el escenario original tiene riesgo alto
+Escenarios alternativos
+Solo se puede modificar:
+principal
+num_cuotas
+No se debe modificar:
+id_cliente
+tipo_interes
+finalidad
+vivienda
+variables estructurales del cliente
+Variaciones de principal
+reducir en tramos absolutos de 5000
+siempre por debajo del principal original
+nunca generar principal por debajo de 5000
+Ejemplos:
+45000: 40000, 35000, 30000, 25000, 20000, 15000, 10000, 5000
+12000 : 7000
+5000: ninguna variación de principal
+Variaciones de num_cuotas
+Usar únicamente el conjunto:
+12
+24
+36
+48
+60
+A partir del valor original, generar solo las superiores válidas.
+Ejemplos:
+12: 24, 36, 48, 60
+24: 36, 48, 60
+36: 48, 60
+48: 60
+60: ninguna
+Combinaciones válidas
+solo cambio de principal
+solo cambio de cuotas
+cambio combinado de ambos
+Evitar duplicados
+duplicado = mismo principal + mismo num_cuotas
+Exclusión del escenario original
+no incluir nunca el escenario original sin cambios.
+Filtrado
+eliminar alternativas con riesgo alto
+eliminar alternativas con pe &gt;= pe original
+Ranking
+ranking_score = 0.5 * riesgo_score + 0.3 * pe_relativa + 0.2 * impacto_cambio
+donde:
+riesgo_score:
+bajo = 0
+medio = 1
+alto = 2
+pe_relativa = pe / principal
+impacto_cambio = porcentaje_reduccion_principal + porcentaje_aumento_cuotas
+Cálculos
+porcentaje_reduccion_principal = (principal_original - principal) / principal_original
+porcentaje_aumento_cuotas = (cuotas - cuotas_original) / cuotas_original
+Orden
+menor ranking_score = mejor
+devolver todas las alternativas válidas ordenadas
+marcar la primera como mejor
+Rol del LLM
+El LLM debe:
+explicar
+El LLM no debe:
+decidir
+recalcular scoring
+recalcular pérdida esperada
+generar escenarios
+alterar el ranking
+## 5. ESTRUCTURA OBJETIVO DE REFERENCIA
+Como referencia, la solución debería tender a algo así, si el análisis lo confirma:
+07_deployment/
+├── api/
+│   ├── main.py
+│   ├── schemas.py
+│   ├── scoring.py
+│   ├── mcp_schemas.py
+│   └── mcp_server.py
+└── app/
+    ├── app.py
+    └── agent_service.py
+Notas:
+`mcp_schemas.py` debe contener los contratos internos del MCP, separados de `schemas.py` si hay fragilidad.
+`mcp_server.py` debe contener el servidor MCP real y la lógica MCP asociada.
+`agent_service.py` debe contener la integración del agente con OpenAI y el consumo del servidor MCP.
+No asumas que hacen falta más archivos salvo necesidad real.
+## 6. CONTRATOS INTERNOS QUE PODRÍAN SER NECESARIOS
+Es probable que convenga definir contratos internos para esta capa, preferiblemente separados de los schemas actuales de la API si detectas fragilidad.
+No debes asumir que esta estructura es obligatoria sin revisar primero el código real, pero si tu análisis lo confirma, podrían existir estructuras como:
+SimulationInput
+id_cliente: int
+principal: float
+tipo_interes: float
+num_cuotas: int
+finalidad: str
+vivienda: str
+ScoringResult
+id_cliente: int
+score_pd: float
+score_ead: float
+score_lgd: float
+pe: float
+nivel_riesgo: str
+Scenario
+input: SimulationInput
+scoring: ScoringResult
+ranking_score: float
+impacto_cambio: float
+es_mejor: bool
+MCPResult
+escenario_original: Scenario
+alternativas: list[Scenario]
+mejor_alternativa: Scenario | None
+activar_chat: bool
+## 7. PUNTOS A INSPECCIONAR OBLIGATORIAMENTE
+Debes inspeccionar primero estos archivos reales:
+07_deployment/api/main.py
+07_deployment/api/schemas.py
+07_deployment/api/scoring.py
+07_deployment/app/app.py
+No propongas la solución final sin revisar esos archivos.
+## 8. SALIDA QUE QUIERO EN ESTA FASE
+Después de inspeccionar el código, quiero que me entregues solo estas salidas:
+Resumen del contrato real de /predict
+Debes indicar:
+payload real de entrada
+formato real de salida
+cómo se representa la pérdida esperada
+si devuelve lista o un único objeto
+detalles importantes de compatibilidad
+Resumen de cómo la app Streamlit consume hoy la API
+Debes indicar:
+URL base o configuración observada
+endpoint utilizado
+payload real
+cómo interpreta hoy el riesgo
+punto mínimo y seguro de integración para añadir el chat
+Decisión técnica explícita sobre MCP
+Debes indicar:
+qué framework MCP real usarías
+por qué ese framework encaja con esta estructura
+cómo implementarías MCP protocol real dentro de esta API
+cómo quedaría el endpoint MCP real
+si sería necesario uno o más de un endpoint MCP URL
+cuántas tools expondrías
+cómo el agente consumiría ese servidor MCP desde OpenAI
+cómo se mantendría simple y sin romper /predict
+Propuesta de estructura técnica final
+Debes indicar:
+qué archivos nuevos crearías
+qué archivos existentes NO tocarías
+qué archivos tocarías solo mínimamente
+qué lógica viviría en cada uno
+Evaluación explícita de riesgo de modificación
+Debes indicar:
+qué cambios te parecen seguros
+qué cambios te parecen frágiles
+si conviene separar los contratos internos MCP de schemas.py
+si conviene evitar llamadas HTTP internas entre componentes ya existentes
+Plan de implementación por pasos
+Quiero un plan:
+pequeño
+prudente
+incremental
+basado en el código real
+que minimice el riesgo de regresión
+## 9. RESTRICCIONES DE SALIDA
+En esta fase:
+no implementes todavía la solución completa
+no generes código masivo
+no modifiques muchos archivos de golpe
+no supongas cosas que no hayas verificado
+no llames MCP real a una simple API auxiliar REST
+no propongas varios endpoints MCP por comodidad sin justificarlo
+no mezcles todavía los contratos internos con los externos sin justificarlo
+no inventes rutas o mensajes MCP “estándar” sin verificar el framework/protocolo elegido
+no diseñes el consumo del MCP desde Streamlit; debe consumirlo el agente
+## 10. Objetivo de esta fase 
+Tu objetivo en esta fase es:
+inspeccionar,
+proponer una integración real de MCP,
+y dejar un plan seguro y coherente con el código existente.
+Prompt 2: 
+# Implementación controlada 
+Quiero que implementes ahora la solución acordada tras el análisis previo del proyecto, siguiendo estrictamente el código real existente y manteniendo un enfoque muy conservador.
+Debes respetar exactamente la decisión técnica tomada en la fase anterior:
+Debe implementarse MCP protocol real.
+El servidor MCP debe quedar embebido dentro de la capa API existente.
+Debe usarse FastMCP como framework MCP real por defecto, salvo limitación técnica real y verificada.
+El agente/LLM debe ser quien consuma el servidor MCP.
+La app Streamlit no debe consumir el MCP directamente.
+Debe existir un único endpoint MCP URL y debe fijarse en `/mcp`.
+No deben dejarse alternativas abiertas como `/mcp` o `/mcp/v1`.
+Debe exponerse una sola tool MCP principal por defecto.
+Solo podrá añadirse una segunda tool si se justifica claramente que aporta valor real sin aumentar complejidad innecesaria.
+La integración con OpenAI debe hacerse de forma preferente mediante:
+`app/agent_service.py`
+Responses API
+tool type `mcp`
+`server_url` apuntando a `/mcp`
+No debes reemplazar MCP protocol real por una API auxiliar REST.
+No debes inventar manualmente rutas o pseudoestándares MCP si el framework elegido ya resuelve esa parte.
+## 1. OBJETIVO DE IMPLEMENTACIÓN
+Debes implementar la solución acordada para que:
+la API actual siga funcionando
+la app Streamlit siga funcionando
+se incorpore un servidor MCP real dentro de la API
+cuando el caso sea de riesgo alto se habilite un chat
+el chat use OpenAI
+el agente consulte el servidor MCP real para obtener alternativas
+el servidor MCP genere, evalúe, filtre y ordene escenarios
+el LLM devuelva una explicación profesional en lenguaje natural
+## 2. REGLAS GENERALES DE IMPLEMENTACIÓN
+Debes respetar estas reglas:
+No rompas nada de lo que ya funciona.
+No hagas refactors grandes.
+No cambies contratos externos existentes salvo necesidad real.
+Añade piezas nuevas de forma aislada siempre que sea posible.
+Si en el análisis previo detectaste fragilidad en schemas.py, mantén los contratos internos por separado.
+Implementa la solución de la forma más simple, estable y didáctica posible.
+Reutiliza el scoring actual.
+No dupliques lógica de scoring si puedes reutilizar funciones existentes.
+Evita llamadas HTTP internas desde la API hacia sí misma si es posible.
+Prefiere reutilización de funciones Python internas cuando sea seguro.
+No conviertas esto en multiagente.
+No metas la lógica del LLM dentro de la API.
+Mantén la parte de explicación y llamada a OpenAI en app/agent_service.py.
+Toca app/app.py solo lo mínimo necesario.
+Mantén rigor terminológico: no confundas MCP protocol real con endpoints REST auxiliares.
+Usa un framework MCP real y compatible si esa fue la decisión tomada en la fase anterior.
+## 3. ESTRUCTURA OBJETIVO
+La estructura final debe seguir la propuesta acordada en la fase anterior.
+Como referencia, si el análisis lo validó, debería tender a esto:
+07_deployment/
+├── api/
+│   ├── main.py
+│   ├── schemas.py
+│   ├── scoring.py
+│   ├── mcp_schemas.py
+│   └── mcp_server.py
+└── app/
+    ├── app.py
+    └── agent_service.py
+Reglas adicionales:
+No crees más archivos salvo necesidad clara y justificada.
+No añadas un archivo adicional para tools salvo que sea realmente necesario y lo expliques brevemente.
+Debes asumir como diseño cerrado:
+`api/mcp_server.py` implementa el servidor FastMCP
+el endpoint MCP real queda fijado en `/mcp`
+no se crearán archivos extra para “tools” salvo necesidad técnica real y justificada
+## 4. CONTRATOS INTERNOS
+Si en la fase anterior se validó separar contratos internos, crea en un archivo separado de schemas.py las estructuras necesarias para representar:
+input de simulación
+resultado de scoring adaptado al servidor MCP
+escenario evaluado
+resultado global de alternativas
+Si el análisis previo validó la estructura siguiente, puedes implementarla:
+SimulationInput
+id_cliente: int
+principal: float
+tipo_interes: float
+num_cuotas: int
+finalidad: str
+vivienda: str
+ScoringResult
+id_cliente: int
+score_pd: float
+score_ead: float
+score_lgd: float
+pe: float
+nivel_riesgo: str
+Scenario
+input: SimulationInput
+scoring: ScoringResult
+ranking_score: float = 0.0
+impacto_cambio: float = 0.0
+es_mejor: bool = False
+MCPResult
+escenario_original: Scenario
+alternativas: list[Scenario]
+mejor_alternativa: Scenario | None
+activar_chat: bool
+No mezcles estos contratos con schemas.py si el análisis previo indicó riesgo de regresión.
+## 5. REGLAS FUNCIONALES
+Debes implementar las reglas funcionales ya acordadas y contrastadas con el análisis previo.
+Como referencia, si fueron validadas:
+Clasificación del riesgo 
+pe &lt; 1000 -&gt; bajo
+1000 &lt;= pe &lt; 5000 -&gt; medio
+pe &gt;= 5000 -&gt; alto
+Activación del chat
+solo si el escenario original tiene riesgo alto
+Generacion de escenarios
+Modificar solo:
+principal
+num_cuotas
+Reglas para principal
+Reducir en tramos de 5000,
+Siempre por debajo del original
+Nunca por debajo de 5000
+Reglas para num_cuotas
+Usar solo:
+12
+24
+36
+48
+60
+Y solo valores superiores al orignal
+Escenarios a generar
+solo principal
+solo cuotas
+combinados
+Reglas de validez
+evitar duplicados
+no incluir el escenario original
+Filtrado
+eliminar alternativas con riesgo alto
+eliminar alternativas con pe &gt;= pe original
+Ranking
+ranking_score = 0.5 * riesgo_score + 0.3 * pe_relativa + 0.2 * impacto_cambio
+donde:
+riesgo_score:
+bajo = 0
+medio = 1
+alto = 2
+pe_relativa = pe / principal
+impacto_cambio = porcentaje_reduccion_principal + porcentaje_aumento_cuotas
+Cálculos
+porcentaje_reduccion_principal = (principal_original - principal) / principal_original
+porcentaje_aumento_cuotas = (cuotas - cuotas_original) / cuotas_original
+Orden
+menor ranking_score = mejor
+devolver todas las alternativas válidas ordenadas
+marcar la primera como mejor
+## 6. RESPONSABILIDAD DE CADA ARCHIVO
+api/main.py
+mantener endpoint(s) existente(s)
+no romper /predict
+tocar solo si hace falta registrar o integrar el servidor MCP real de forma mínima y segura
+api/schemas.py
+mantener estable
+no mezclar aquí contratos internos si eso introduce riesgo
+api/scoring.py
+mantener la lógica actual
+solo añadir auxiliares si son necesarias para reutilización segura
+api/mcp_schemas.py
+contratos internos del servidor MCP
+sin lógica de negocio
+sin pydantic si se acordó usar dataclasses
+api/mcp_server.py
+implementar el servidor MCP real usando FastMCP
+implementar la lógica necesaria para:
+clasificación de riesgo
+generación de escenarios
+transformación de resultados
+filtrado
+ranking
+exposición de la tool MCP real
+fijar el endpoint MCP real en `/mcp`
+exponer una sola tool principal por defecto, encargada de simular, evaluar, filtrar y ordenar alternativas
+solo añadir una segunda tool si existe una justificación técnica clara y útil para esta solución
+app/agent_service.py
+implementar la llamada a OpenAI
+usar SDK moderno
+leer OPENAI_API_KEY desde entorno
+construir contexto e instrucciones
+conectar el agente con el servidor MCP real mediante:
+Responses API
+tool type `mcp`
+`server_url` apuntando a `/mcp`
+devolver respuesta natural y profesional
+incluir fallback seguro si falla el LLM
+app/app.py
+modificar solo lo mínimo para:
+activar el chat si el caso es de riesgo alto
+pasar el caso al agente
+mostrar la respuesta
+## 7. REQUISITOS OPENAI
+En app/agent_service.py:
+usa el SDK moderno de OpenAI
+no uses openai.ChatCompletion legado
+usa `OPENAI_API_KEY` desde entorno
+en desarrollo local, debe poder cargarse desde un archivo `.env` si ya existe en el proyecto
+ese archivo `.env` es solo para entorno local y no debe asumirse disponible en producción
+en Render, la clave debe obtenerse desde las variables de entorno del servicio
+no hardcodees claves
+si es necesario para soportar `.env` en local, puedes usar `python-dotenv`
+usa Responses API con integración de remote MCP server a través de:
+tool type `mcp`
+`server_url` apuntando a `/mcp`
+solo podrás apartarte de este patrón si detectas una limitación técnica real, concreta y verificable
+no sustituyas esta integración por function calling manual si el objetivo acordado es usar MCP protocol real
+Además:
+el agente debe consumir el servidor MCP real, no una API REST sustitutiva
+documenta brevemente en comentarios cualquier decisión técnica importante
+no inventes integración MCP manual si el framework elegido o el SDK ofrecen una forma más directa y simple
+## 8. MODO DE TRABAJO
+Debes ejecutar el trabajo en este orden:
+Crear los archivos nuevos acordados en la fase anterior.
+Implementar primero los contratos internos y la lógica MCP.
+Implementar después el servidor MCP real con el framework elegido.
+Integrar después el servidor MCP real dentro de la API sin romper /predict.
+Integrar después el agente con OpenAI y el servidor MCP.
+Aplicar al final los cambios mínimos y seguros en app.py.
+Mantener comentarios breves y útiles solo donde ayuden a entender decisiones importantes.
+No tocar partes no relacionadas.
+## 9. ENTREGA FINAL ESPERADA
+Al final, debes entregar un resumen con:  
+archivos creados
+archivos modificados
+motivo de cada cambio
+supuestos o limitaciones
+puntos a probar manualmente en local antes de subir a Render
+## 10. RESTRICCIONES FINALES
+No hagas esto:
+no cambies el contrato externo de /predict
+no reemplaces la lógica actual de scoring
+no mezcles contratos internos con schemas.py si el análisis previo mostró fragilidad
+no añadas servicios extra innecesarios
+no conviertas esto en arquitectura compleja
+no hagas refactors cosméticos
+no sustituyas MCP protocol real por una API auxiliar
+no añadas varios endpoints MCP por comodidad
+no expongas más tools de las necesarias
+no implementes el protocolo MCP manualmente a bajo nivel si el framework elegido resuelve esa capa de forma más segura
+no cambies FastMCP por otro framework sin justificar una limitación técnica real y verificada
+no expongas más de una tool MCP por defecto sin justificarlo claramente
+## 11. OBJETIVO FINAL
+Tu objetivo es dejar implementada una solución segura, clara y coherente con la estructura existente, incorporando un servidor MCP real dentro de la API y conectándolo con el agente de OpenAI, minimizando el riesgo sobre lo ya funcional.
+Elementos fijos y adaptables del prompt
+En esta tabla se identifican los apartados del prompt que pueden reutilizarse en otros proyectos sin necesidad de modificarlos, y aquellos que sí deben adaptarse en función de la estructura, la lógica de negocio o las necesidades concretas de cada caso.
+Bloque / apartado
+Tipo
+Qué significa
+Introducción del rol del agente y objetivo de la fase
+Fijo
+Siempre debe dejar claro qué papel tiene el agente y qué se espera en esa fase: analizar primero o implementar después.
+Contexto del proyecto
+Variable
+Depende del proyecto concreto: stack, carpetas, archivos, estado actual, despliegue, frontend, endpoints existentes.
+Objetivo funcional buscado
+Semifijo
+La idea general se mantiene: integrar MCP sin romper lo existente. Lo que cambia es la función concreta del MCP dentro del caso de uso.
+Restricciones de diseño / implementación
+Fijo
+Son reglas metodológicas reutilizables: no romper lo existente, no refactors grandes, no arquitectura innecesaria, no hardcodear secretos, etc.
+Decisión técnica sobre MCP
+Semifijo
+La parte fija es exigir MCP real y no una API que lo imite. Puede cambiar el framework concreto, el path del endpoint o algún detalle de integración si otro proyecto lo requiere.
+Comportamiento funcional de referencia / reglas del caso
+Variable
+Es la lógica de negocio del MCP: qué calcula, qué modifica, qué filtra, cómo ordena, qué devuelve.
+Estructura objetivo de referencia
+Semifijo
+La idea de añadir pocos archivos y separar responsabilidades se mantiene. Pueden cambiar nombres, ubicaciones o incluso si algún archivo adicional hace falta o no.
+Contratos internos que podrían ser necesarios
+Semifijo
+La idea de definir contratos internos separados suele mantenerse. Cambian los modelos, campos y estructuras concretas según el caso.
+Puntos a inspeccionar obligatoriamente
+Variable
+Cambian según los archivos y módulos reales del proyecto.
+Salida esperada de la fase
+Fijo
+La estructura de salida puede mantenerse casi igual: resumen de contrato actual, integración, riesgos, estructura propuesta y plan.
+Responsabilidad de cada archivo
+Semifijo
+La lógica de repartir responsabilidades entre archivos se mantiene. Cambian los nombres concretos de esos archivos y qué piezas existen ya en el proyecto.
+Requisitos de integración con OpenAI
+Semifijo
+La idea general puede mantenerse, pero puede cambiar el SDK, el archivo donde vive la integración o la forma concreta de consumo según el proyecto.
+Modo de trabajo / secuencia de ejecución
+Fijo
+El orden prudente también puede reutilizarse: analizar, crear piezas nuevas, integrar de forma mínima, tocar al final el frontend o app.
+Entrega final esperada
+Fijo
+El resumen de cambios, supuestos, limitaciones y pruebas manuales es reusable en casi cualquier proyecto.
+Restricciones de salida / restricciones finales
+Fijo
+Son reglas de control del agente y deberían mantenerse casi siempre.
+Objetivo final de la fase
+Fijo
+Cierra el prompt y refuerza el propósito: solución segura, clara, coherente y con mínimo riesgo de regresión.

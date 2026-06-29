@@ -4,6 +4,8 @@ import streamlit as st
 import pandas as pd
 from streamlit_echarts import st_echarts
 
+from agent_service import explain_high_risk_case
+
 
 # =========================
 # CONFIGURACIÓN TÉCNICA
@@ -92,7 +94,7 @@ def post_scoring(payload):
 def get_risk_band(perdida):
     if perdida >= 5000:
         return "ALTO"
-    elif perdida >= 2000:
+    elif perdida >= 1000:
         return "MEDIO"
     else:
         return "BAJO"
@@ -203,6 +205,10 @@ st.markdown(
 
 if "scoring_result" not in st.session_state:
     st.session_state["scoring_result"] = None
+if "case_context" not in st.session_state:
+    st.session_state["case_context"] = None
+if "chat_messages" not in st.session_state:
+    st.session_state["chat_messages"] = []
 
 if ejecutar:
     payload = [
@@ -219,6 +225,8 @@ if ejecutar:
         result = post_scoring(payload)
     if result["ok"] and isinstance(result["data"], list) and len(result["data"]) > 0:
         st.session_state["scoring_result"] = result["data"][0]
+        st.session_state["case_context"] = payload[0]
+        st.session_state["chat_messages"] = []
     else:
         st.session_state["scoring_result"] = None
         st.error(f"Error en la inferencia: {result['error_message']}")
@@ -406,6 +414,41 @@ if data:
             f"<div style='text-align:center;font-size:1.1rem;'>LGD: {data['score_lgd']*100:.2f}%</div>",
             unsafe_allow_html=True,
         )
+
+    if riesgo_tipo == "ALTO" and st.session_state.get("case_context"):
+        st.markdown("---")
+        st.subheader("Asistente de alternativas (riesgo alto)")
+        st.caption(
+            "El asistente consulta la lógica MCP para proponer escenarios alternativos "
+            "y explicarlos en lenguaje natural."
+        )
+
+        for message in st.session_state["chat_messages"]:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+
+        user_prompt = st.chat_input(
+            "Pregunta por alternativas de principal o plazo..."
+        )
+        if user_prompt:
+            st.session_state["chat_messages"].append(
+                {"role": "user", "content": user_prompt}
+            )
+            with st.chat_message("user"):
+                st.markdown(user_prompt)
+
+            with st.chat_message("assistant"):
+                with st.spinner("Consultando alternativas..."):
+                    answer = explain_high_risk_case(
+                        case=st.session_state["case_context"],
+                        scoring=data,
+                        pe_euros=pe_euros,
+                        user_message=user_prompt,
+                    )
+                st.markdown(answer)
+            st.session_state["chat_messages"].append(
+                {"role": "assistant", "content": answer}
+            )
 
 else:
     st.info("Introduce los datos y pulsa 'Calcular riesgo'.")
