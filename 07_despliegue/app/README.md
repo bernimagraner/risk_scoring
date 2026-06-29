@@ -16,8 +16,8 @@
 
 ## Notas
 - No cierres la terminal de la API mientras usas la app.
-- La API debe estar activa y accesible en http://127.0.0.1:8000 (o la URL que configures).
-- Si despliegas en Render, recuerda cambiar API_BASE_URL en app.py por la URL pública de la API.
+- En local, la API debe estar activa en http://127.0.0.1:8000.
+- En producción (Render), la app usa `API_BASE_URL = https://risk-scoring-api-o9ec.onrender.com`.
 
 ## Despliegue en Render (guía)
 - Root Directory: 07_despliegue/app

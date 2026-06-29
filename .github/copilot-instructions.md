@@ -7,47 +7,71 @@
 
 ## ESTADO ACTUAL DEL PROYECTO
 
-**Fase completada**: A_11_API_Deployer
-**Modo**: LOCAL + RENDER_ROOT_READY
+**Fase actual:** Interfaz Streamlit para inferencia ML (A_12_Streamlit_ML_App_Builder)
 
-**Rutas clave**:
-	- Motor scoring: `07_despliegue/api/scoring.py`
-	- Artefacto: `07_despliegue/api/artefacto_pipeline.pkl`
-	- API local: `07_despliegue/api/main.py`
+**Repositorio GitHub:**
+- https://github.com/bernimagraner/risk_scoring
 
-**Comando de arranque local validado:**
-```bash
-uvicorn api.main:app --reload --app-dir ..
-```
+**API de inferencia consumida por la app:**
+- Ruta: 07_despliegue/api/
+- URL producción: https://risk-scoring-api-o9ec.onrender.com
+- Endpoint: POST /predict
+- Entrada canónica: [{...}]
+- Salida canónica: lista JSON de objetos
+- Contrato heredado desde A_11 sin redefinición en A_12
 
-**Contrato final de entrada y salida:**
-	- Endpoint canónico de inferencia: `POST /predict`
-	- Formato canónico de entrada: lista JSON de registros `[{...}]`
-	- Formato canónico de salida: lista JSON de objetos serializada desde el DataFrame del motor
-	- Modalidad de salida elegida: salida completa
-	- Columnas reales de salida: todas las columnas devueltas por `scoring_df(df)`
-	- Ejemplo válido de respuesta final:
-```json
-[
-	{
-		"id_cliente": 1,
-		"principal": 10000.0,
-		"tipo_interes": 4.5,
-		"num_cuotas": " 36 months",
-		"finalidad": "home_improvement",
-		"vivienda": "MORTGAGE",
-		"score": 0.83
-	}
-]
-```
+**Artefactos generados:**
+- 07_despliegue/app/
+- 07_despliegue/app/idea/
+- 07_despliegue/app/assets/
 
-**Configuración validada de Render:**
-	- Root Directory: 07_despliegue/api
-	- Build Command: pip install -r requirements.txt
-	- Start Command: uvicorn api.main:app --host 0.0.0.0 --port $PORT --app-dir ..
-	- Key: PYTHON_VERSION
-	- Value: 3.11.15
+**Dependencias principales:**
+- streamlit
+- requests
 
-**Siguiente paso recomendado:**
-	- Commit y push a GitHub incluyendo `07_despliegue/api/data/demo_03_riesgos.csv`
-	- Alta manual del servicio en Render usando la configuración anterior
+La app consume la API de inferencia generada en la fase anterior.
+
+**Configuración de Render de la API vigente:**
+- Root Directory: 07_despliegue/api
+- Build Command: pip install -r requirements.txt
+- Start Command: uvicorn api.main:app --host 0.0.0.0 --port $PORT --app-dir ..
+- Key: PYTHON_VERSION
+- Value: 3.11.15
+
+**Configuración de Render de la app:**
+- Root Directory: 07_despliegue/app
+- Build Command: pip install -r requirements.txt
+- Start Command: streamlit run app.py --server.port $PORT --server.address 0.0.0.0
+- Key: PYTHON_VERSION
+- Value: 3.11.15
+
+**Ejecución local de la app:**
+1. Activa primero el entorno Python operativo del proyecto.
+2. Arranca la API en una terminal dedicada:
+   ```bash
+   cd 07_despliegue/api
+   uvicorn api.main:app --reload --app-dir ..
+   ```
+3. Abre una segunda terminal, activa el mismo entorno y ejecuta:
+   ```bash
+   cd 07_despliegue/app
+   streamlit run app.py
+   ```
+4. Usa `pip install -r requirements.txt` solo si faltan dependencias o no existe entorno operativo.
+
+**Modo operativo por defecto:**
+- Local-first
+
+**Guía de Render:**
+- La app se despliega solo después de validar el flujo local.
+- La API debe estar previamente desplegada y accesible.
+- `API_BASE_URL` en `07_despliegue/app/app.py`: `https://risk-scoring-api-o9ec.onrender.com`
+- Para desarrollo local, sustituir temporalmente por `http://127.0.0.1:8000`.
+
+**Notas adicionales:**
+- Si usas servicios gratuitos, la primera llamada puede tardar por cold start; la app ya está preparada para gestionarlo.
+- Si tienes imágenes (logo, favicon, etc.), deben estar en `07_despliegue/app/assets/`.
+
+---
+
+El resto del archivo `copilot-instructions.md` permanece intacto.
