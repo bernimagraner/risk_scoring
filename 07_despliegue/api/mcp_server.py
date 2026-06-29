@@ -8,6 +8,8 @@ mcp = FastMCP(
         "Servidor MCP de scoring de riesgo crediticio. "
         "Genera y evalúa escenarios alternativos de préstamo."
     ),
+    # host distinto de localhost evita la protección DNS solo-local por defecto
+    host="0.0.0.0",
     streamable_http_path="/",
     stateless_http=True,
 )
