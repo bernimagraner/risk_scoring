@@ -10,7 +10,7 @@ from agent_service import explain_high_risk_case
 # =========================
 # CONFIGURACIÓN TÉCNICA
 # =========================
-API_BASE_URL = "https://risk-scoring-app.onrender.com"
+API_BASE_URL = "https://risk-scoring-api-o9ec.onrender.com"
 SCORE_ENDPOINT = "/predict"
 WARMUP_ENDPOINT = "/docs"
 DEFAULT_TIMEOUT = 30
